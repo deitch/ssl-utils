@@ -8,6 +8,7 @@ INSTALLBIN := $(GOBIN)/$(BIN)
 export GO111MODULE=on
 
 LINTER ?= $(GOBIN)/golangci-lint
+LINTER_VERSION ?= v1.23.3
 GOFILES := $(shell find . -name '*.go')
 
 build: $(LOCALBIN)
@@ -33,7 +34,7 @@ vet:
 
 golangci-lint: $(LINTER)
 $(LINTER):
-	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.17.1
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(LINTER_VERSION)
 
 golint:
 ifeq (, $(shell which golint))
