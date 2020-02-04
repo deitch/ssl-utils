@@ -1,12 +1,15 @@
 BIN := ca
+GOBIN ?= $(shell go env GOPATH)/bin
 LOCALBIN := ./$(BIN)
-INSTALLBIN := ${GOPATH}/bin/$(BIN)
+INSTALLBIN := $(GOBIN)/$(BIN)
 
-.PHONY: build clean fmt test fmt-check
+.PHONY: build clean fmt test fmt-check lint golint golangci-lint
 
 export GO111MODULE=on
 
+LINTER ?= $(GOBIN)/golangci-lint
 GOFILES := $(shell find . -name '*.go')
+
 build: $(LOCALBIN)
 $(LOCALBIN):
 	go build -o $@ .
@@ -27,6 +30,19 @@ fmt-check:
 
 vet:
 	go vet ./...
+
+golangci-lint: $(LINTER)
+$(LINTER):
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.17.1
+
+golint:
+ifeq (, $(shell which golint))
+	go get -u golang.org/x/lint/golint
+endif
+
+## Lint the files
+lint: golint golangci-lint
+	@$(LINTER) run --disable-all --enable=golint ./...
 
 test:
 	go test ./...

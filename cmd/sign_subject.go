@@ -47,17 +47,17 @@ var signSubjectCmd = &cobra.Command{
 		}
 		if saNames != "" {
 			sans := strings.Split(saNames, ",")
-			sansDns := make([]string, 0)
+			sansDNS := make([]string, 0)
 			sansIps := make([]net.IP, 0)
 			for _, s := range sans {
 				ip := net.ParseIP(s)
 				if ip == nil {
-					sansDns = append(sansDns, s)
+					sansDNS = append(sansDNS, s)
 				} else {
 					sansIps = append(sansIps, ip)
 				}
 			}
-			template.DNSNames = sansDns
+			template.DNSNames = sansDNS
 			template.IPAddresses = sansIps
 		}
 
