@@ -40,14 +40,37 @@ That is it!
 Now you can generate a key/cert using that CA, or any other CA key/cert you have lying around (who leaves them "lying around"?).
 
 ```
-ca sign --subject "CN=server.victory.yours,C=US,ST=NV" --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem
+ca sign subject --subject "CN=server.victory.yours,C=US,ST=NV" --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem
 ```
 
 It supports Subject Alternative Names (SANs), by passing them comma-separated, for example:
 
 ```
-ca sign --subject "CN=server.victory.yours,C=US,ST=NV" --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --san 1.2.3.4,foo.bar.com
+ca sign subject --subject "CN=server.victory.yours,C=US,ST=NV" --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --san 1.2.3.4,foo.bar.com
 ```
+
+### Sign a CSR from a CA
+
+```
+ca sign csr --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --csr ./server/csr.pem 
+```
+
+It supports Subject Alternative Names (SANs), by passing them comma-separated, for example:
+
+```
+ca sign csr --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --csr ./server/csr.pem --san 1.2.3.4,foo.bar.com
+```
+
+### Read a File
+
+Read the basic contents of a key, certificate or certificate request file, pem-encoded. It won't give you the _entire_ output that you would get
+from openssl, but gives the basics you need most of the time when working with certificates:
+
+```
+ca read --file /path/to/file
+```
+
+It will try to determine if the file is a certificate, a private key or a certificate request, based on its PEM-encoding.
 
 ## Building
 
