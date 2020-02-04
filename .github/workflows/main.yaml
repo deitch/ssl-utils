@@ -1,0 +1,36 @@
+name: Continuous Integration
+on:
+ pull_request:
+   types: [opened, synchronize, reopened]
+ push:
+   branches:
+     - master
+
+jobs:
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    steps:
+    - name: ref
+      run: echo ${{ github.ref }}
+    - name: event_name
+      run: echo ${{ github.event_name }}
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v1
+    - uses: actions/setup-go@v1
+      with:
+        go-version: '1.13.5' # The Go version to download (if necessary) and use.
+    - name: fmt-check
+      run: make fmt-check
+    - name: lint
+      run: make lint
+    - name: vet
+      run: make vet
+    - name: test
+      run: make test
+    - name: build
+      run: make build
