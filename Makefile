@@ -2,7 +2,7 @@ BIN := ca
 LOCALBIN := ./$(BIN)
 INSTALLBIN := ${GOPATH}/bin/$(BIN)
 
-.PHONY: build clean fmt
+.PHONY: build clean fmt test fmt-check
 
 export GO111MODULE=on
 
@@ -20,6 +20,10 @@ clean:
 
 fmt:
 	gofmt -w -s $(GOFILES)
+
+fmt-check:
+	@FMTOUT=$$(gofmt -l $(GOFILES)); \
+	if [ -n "$${FMTOUT}" ]; then echo $${FMTOUT}; exit 1; fi
 
 vet:
 	go vet ./...
