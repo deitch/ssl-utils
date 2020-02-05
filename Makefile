@@ -1,3 +1,30 @@
+# BUILDARCH is the host architecture
+# ARCH is the target architecture
+# we need to keep track of them separately
+BUILDARCH ?= $(shell uname -m)
+BUILDOS ?= $(shell uname -s | tr A-Z a-z)
+
+# canonicalized names for host architecture
+ifeq ($(BUILDARCH),aarch64)
+BUILDARCH=arm64
+endif
+ifeq ($(BUILDARCH),x86_64)
+BUILDARCH=amd64
+endif
+
+# unless otherwise set, I am building for my own architecture, i.e. not cross-compiling
+# and for my OS
+ARCH ?= $(BUILDARCH)
+OS ?= $(BUILDOS)
+
+# canonicalized names for target architecture
+ifeq ($(ARCH),aarch64)
+        override ARCH=arm64
+endif
+ifeq ($(ARCH),x86_64)
+    override ARCH=amd64
+endif
+
 BIN := ca
 GOBIN ?= $(shell go env GOPATH)/bin
 LOCALBIN := ./$(BIN)
@@ -13,7 +40,7 @@ GOFILES := $(shell find . -name '*.go')
 
 build: $(LOCALBIN)
 $(LOCALBIN):
-	go build -o $@ .
+	GOOS=$(OS) GOARCH=$(ARCH) go build -o $@ .
 
 install: $(INSTALLBIN)
 $(INSTALLBIN):

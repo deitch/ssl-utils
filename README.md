@@ -85,3 +85,10 @@ and `ca` will be available in this directory. To install into golang's standard 
 ```
 make install
 ```
+
+By default, it builds for your local OS and ARCH. To cross-compile:
+
+```
+make build OS=<target> ARCH=<target>
+```
+
