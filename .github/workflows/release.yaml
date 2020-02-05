@@ -39,7 +39,7 @@ jobs:
           name: upload_url
           path: upload_url
   build:
-    name: Build Artifacts
+    name: Build And Release Artifacts
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -65,7 +65,7 @@ jobs:
     - name: Set upload_url
       id: upload_url
       run: |
-          echo ::set-output name=upload_url::$(cat upload_url)
+          echo ::set-output name=upload_url::$(cat upload_url/upload_url)
     - name: Upload Release Assets
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1.0.1
