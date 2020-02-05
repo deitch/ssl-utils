@@ -17,6 +17,12 @@ ssl-utils is a simple utility that lets you do _just_ the above:
 
 That is it!
 
+## Installing
+
+Just download the file for your operating system and architecture on the "Releases" page.
+
+For those who just love compiling, clone this repo and run `make build`.
+
 ## How to use it
 
 
