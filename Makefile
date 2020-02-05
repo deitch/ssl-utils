@@ -25,22 +25,28 @@ ifeq ($(ARCH),x86_64)
     override ARCH=amd64
 endif
 
+BINDIR := ./dist
 BIN := ca
-GOBIN ?= $(shell go env GOPATH)/bin
-LOCALBIN := ./$(BIN)
-INSTALLBIN := $(GOBIN)/$(BIN)
+GOBINDIR ?= $(shell go env GOPATH)/bin
+LOCALBIN := $(BINDIR)/$(BIN)-$(OS)-$(ARCH)
+INSTALLBIN := $(GOBINDIR)/$(BIN)
 
 .PHONY: build clean fmt test fmt-check lint golint golangci-lint
 
 export GO111MODULE=on
 
-LINTER ?= $(GOBIN)/golangci-lint
+LINTER ?= $(GOBINDIR)/golangci-lint
 LINTER_VERSION ?= v1.23.3
 GOFILES := $(shell find . -name '*.go')
 
-build: $(LOCALBIN)
-$(LOCALBIN):
+$(BINDIR):
+	mkdir -p $@
+
+build: $(LOCALBIN) $(BIN)
+$(LOCALBIN): $(BINDIR)
 	GOOS=$(OS) GOARCH=$(ARCH) go build -o $@ .
+$(BIN):
+	if [ "$(OS)" = "$(BUILDOS)" -a "$(ARCH)" = "$(BUILDARCH)" ]; then ln -s $(LOCALBIN) $@; fi
 
 install: $(INSTALLBIN)
 $(INSTALLBIN):
@@ -61,7 +67,7 @@ vet:
 
 golangci-lint: $(LINTER)
 $(LINTER):
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(LINTER_VERSION)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBINDIR) $(LINTER_VERSION)
 
 golint:
 ifeq (, $(shell which golint))
