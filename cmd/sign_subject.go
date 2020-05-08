@@ -12,10 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	saNames string
-)
-
 var signSubjectCmd = &cobra.Command{
 	Use:   "subject",
 	Short: "Generate a private key, generate a CSR and sign it",

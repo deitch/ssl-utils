@@ -9,7 +9,7 @@ Sure, it can do lots of things, the swiss army knife of ssl, but in many cases, 
 
 The number of confusing steps to do this in openssl is too many.
 
-ssl-utils is a simple utility that lets you do _just_ the above: 
+ssl-utils is a simple utility that lets you do _just_ the above:
 
 * generate a CA
 * sign things with the CA
@@ -25,6 +25,16 @@ For those who just love compiling, clone this repo and run `make build`.
 
 ## How to use it
 
+### Generate a CSR
+
+```
+ca csr --subject "CN=server.victory.yours,C=US,ST=NV" --key ./server/key.pem --csr ./server/csr.pem
+```
+It supports Subject Alternative Names (SANs), by passing them comma-separated, for example:
+
+```
+ca csr --subject "CN=server.victory.yours,C=US,ST=NV" --key ./server/key.pem --csr ./server/csr.pem --san 1.2.3.4,foo.bar.com
+```
 
 ### Generate a CA
 
@@ -58,7 +68,7 @@ ca sign subject --subject "CN=server.victory.yours,C=US,ST=NV" --ca-key ./ca/key
 ### Sign a CSR from a CA
 
 ```
-ca sign csr --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --csr ./server/csr.pem 
+ca sign csr --ca-key ./ca/key.pem --ca-cert ./ca/cert.pem --key ./server/key.pem --cert ./server/cert.pem --csr ./server/csr.pem
 ```
 
 It supports Subject Alternative Names (SANs), by passing them comma-separated, for example:
@@ -97,4 +107,3 @@ By default, it builds for your local OS and ARCH. To cross-compile:
 ```
 make build OS=<target> ARCH=<target>
 ```
-

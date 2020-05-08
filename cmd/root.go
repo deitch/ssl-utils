@@ -16,6 +16,8 @@ func init() {
 	signInit()
 	rootCmd.AddCommand(readCmd)
 	readInit()
+	rootCmd.AddCommand(csrCmd)
+	csrInit()
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "print lots of output to stderr")
 }
 

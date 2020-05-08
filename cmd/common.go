@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	caKeyPath, caCertPath string
+	caKeyPath, caCertPath, saNames string
 )
 
 func generatePrivateKey(size int, keyfile string) (*rsa.PrivateKey, error) {
@@ -134,6 +134,25 @@ func loadAndSignCert(caCertPath, caKeyPath string, template *x509.Certificate, p
 	err = signCert(template, caCertParsed, publicKey, caCert.PrivateKey, outCert)
 	if err != nil {
 		return fmt.Errorf("Failed to create certificate: %s", err)
+	}
+	return nil
+}
+
+func saveCSR(csr *x509.CertificateRequest, key *rsa.PrivateKey, filePath string) error {
+	b, err := x509.CreateCertificateRequest(rand.Reader, csr, key)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	pemFormat := &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: b}
+	err = pem.Encode(f, pemFormat)
+	if err != nil {
+		return err
 	}
 	return nil
 }
