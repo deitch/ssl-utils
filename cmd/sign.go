@@ -22,6 +22,7 @@ func signInit() {
 	signCmd.PersistentFlags().StringVar(&caCertPath, "ca-cert", "", "path to the CA certificate to use to sign the output certificate")
 	signCmd.MarkFlagRequired("ca-cert")
 
+	signCmd.PersistentFlags().IntVar(&keySize, "key-size", 4096, "key size to use")
 	signCmd.AddCommand(signCsrCmd)
 	signCsrInit()
 	signCmd.AddCommand(signSubjectCmd)
