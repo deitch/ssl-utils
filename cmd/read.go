@@ -63,12 +63,7 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 		return key, nil
 	}
 	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
-		switch key := key.(type) {
-		case *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey:
-			return key, nil
-		default:
-			return nil, errors.New("tls: found unknown private key type in PKCS#8 wrapping")
-		}
+		return key, nil
 	}
 	if key, err := x509.ParseECPrivateKey(der); err == nil {
 		return key, nil
@@ -94,7 +89,7 @@ func printKey(rawKey crypto.PrivateKey) {
 		fmt.Printf("RSA PRIVATE KEY\n")
 	case *ecdsa.PrivateKey:
 		fmt.Printf("ECDSA PRIVATE KEY\n")
-	case *ed25519.PrivateKey:
+	case ed25519.PrivateKey:
 		fmt.Printf("ED25519 PRIVATE KEY\n")
 	default:
 		fmt.Printf("unknown private key type\n")
