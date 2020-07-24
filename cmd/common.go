@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -11,34 +14,68 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 var (
 	caKeyPath, caCertPath, saNames string
 )
 
-func generatePrivateKey(size int, keyfile string) (*rsa.PrivateKey, error) {
+type KeyType int
+
+const (
+	RSA KeyType = iota
+	Ed25519
+	ECDSA
+)
+
+func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateKey, crypto.PublicKey, error) {
+	var (
+		privateKey, publicKey interface{}
+		err                   error
+	)
 	reader := rand.Reader
-	key, err := rsa.GenerateKey(reader, size)
+	switch keyType {
+	case RSA:
+		rsaPrivateKey, perr := rsa.GenerateKey(reader, size)
+		privateKey = rsaPrivateKey
+		err = perr
+		publicKey = rsaPrivateKey.Public()
+	case Ed25519:
+		publicKey, privateKey, err = ed25519.GenerateKey(reader)
+	case ECDSA:
+		curve := elliptic.P256()
+		ecdsaPrivateKey, perr := ecdsa.GenerateKey(curve, reader)
+		privateKey = ecdsaPrivateKey
+		err = perr
+		publicKey = ecdsaPrivateKey.Public()
+	default:
+		return nil, nil, fmt.Errorf("unknown key type: %v", keyType)
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	b, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	privateKeyPem := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: b,
 	}
 	f, err := os.Create(keyfile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
 
-	var privateKey = &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	}
-
-	err = pem.Encode(f, privateKey)
+	err = pem.Encode(f, privateKeyPem)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return key, nil
+	return privateKey, publicKey, nil
 }
 
 func signCert(template, parent *x509.Certificate, pub crypto.PublicKey, priv crypto.PrivateKey, certfile string) error {
@@ -138,7 +175,7 @@ func loadAndSignCert(caCertPath, caKeyPath string, template *x509.Certificate, p
 	return nil
 }
 
-func saveCSR(csr *x509.CertificateRequest, key *rsa.PrivateKey, filePath string) error {
+func saveCSR(csr *x509.CertificateRequest, key crypto.PrivateKey, filePath string) error {
 	b, err := x509.CreateCertificateRequest(rand.Reader, csr, key)
 	if err != nil {
 		return err
@@ -155,4 +192,18 @@ func saveCSR(csr *x509.CertificateRequest, key *rsa.PrivateKey, filePath string)
 		return err
 	}
 	return nil
+}
+
+func validateKeyType(cmd *cobra.Command, args []string) {
+	switch keyTypeName {
+	case "rsa":
+		keyType = RSA
+	case "ecdsa":
+		keyType = ECDSA
+	case "ed25519":
+		keyType = Ed25519
+	default:
+		fmt.Fprintf(os.Stderr, "unknown key type: %s", keyTypeName)
+		os.Exit(1)
+	}
 }

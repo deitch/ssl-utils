@@ -21,11 +21,10 @@ var signSubjectCmd = &cobra.Command{
 			publicKey crypto.PublicKey
 			template  x509.Certificate
 		)
-		key, err := generatePrivateKey(keySize, keyPath)
+		_, publicKey, err := generateKeyPair(keyType, keySize, keyPath)
 		if err != nil {
-			log.Fatalf("error generating RSA private key: %v", err)
+			log.Fatalf("error generating private key: %v", err)
 		}
-		publicKey = key.Public()
 		name, err := parseSubject(subject)
 		if err != nil {
 			log.Fatalf("error parsing the subject: %v", err)

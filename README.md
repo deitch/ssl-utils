@@ -25,6 +25,8 @@ For those who just love compiling, clone this repo and run `make build`.
 
 ## How to use it
 
+Note that all commands have a help, so you should run `ca --help` or `ca help` or even `ca <command> help` to see all of the options.
+
 ### Generate a CSR
 
 ```

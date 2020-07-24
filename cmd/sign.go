@@ -6,12 +6,15 @@ import (
 
 var (
 	keyPath, certPath string
+	keyTypeName       string
+	keyType           KeyType
 )
 
 var signCmd = &cobra.Command{
-	Use:   "sign",
-	Short: "Sign a CSR or generate and sign it",
-	Long:  `Sign an existing CSR, or generate a key and CSR and sign it.`,
+	Use:              "sign",
+	Short:            "Sign a CSR or generate and sign it",
+	Long:             `Sign an existing CSR, or generate a key and CSR and sign it.`,
+	PersistentPreRun: validateKeyType,
 	Run: func(cmd *cobra.Command, args []string) {
 	},
 }
@@ -23,6 +26,7 @@ func signInit() {
 	signCmd.MarkFlagRequired("ca-cert")
 
 	signCmd.PersistentFlags().IntVar(&keySize, "key-size", 4096, "key size to use")
+	signCmd.PersistentFlags().StringVar(&keyTypeName, "key-type", "rsa", "key type to use, one of: rsa, ecdsa, ed25519")
 	signCmd.AddCommand(signCsrCmd)
 	signCsrInit()
 	signCmd.AddCommand(signSubjectCmd)

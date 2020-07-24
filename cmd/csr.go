@@ -17,9 +17,9 @@ var csrCmd = &cobra.Command{
 		var (
 			template x509.CertificateRequest
 		)
-		key, err := generatePrivateKey(keySize, keyPath)
+		key, _, err := generateKeyPair(keyType, keySize, keyPath)
 		if err != nil {
-			log.Fatalf("error generating RSA private key: %v", err)
+			log.Fatalf("error generating private key: %v", err)
 		}
 		name, err := parseSubject(subject)
 		if err != nil {
