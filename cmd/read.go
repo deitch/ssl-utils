@@ -20,7 +20,7 @@ var readCmd = &cobra.Command{
 	Use:   "read <file>",
 	Short: "Read a certificate, CSR or key",
 	Long:  `Read a certificate, CSR or key`,
-        Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		readPath := args[0]
 		// open and read the file

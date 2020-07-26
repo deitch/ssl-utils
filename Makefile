@@ -46,7 +46,8 @@ build: $(LOCALBIN) $(BIN)
 $(LOCALBIN): $(BINDIR)
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -o $@ .
 $(BIN):
-	if [ "$(OS)" = "$(BUILDOS)" -a "$(ARCH)" = "$(BUILDARCH)" ]; then ln -s $(LOCALBIN) $@; fi
+	@if [ "$(OS)" = "$(BUILDOS)" -a "$(ARCH)" = "$(BUILDARCH)" ]; then rm -f $@; ln -s $(LOCALBIN) $@; fi
+	@echo $@ linked to binary $(LOCALBIN)
 
 install: $(INSTALLBIN)
 $(INSTALLBIN):
