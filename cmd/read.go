@@ -16,13 +16,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var readPath string
-
 var readCmd = &cobra.Command{
-	Use:   "read",
+	Use:   "read <file>",
 	Short: "Read a certificate, CSR or key",
 	Long:  `Read a certificate, CSR or key`,
+        Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		readPath := args[0]
 		// open and read the file
 		b, err := ioutil.ReadFile(readPath)
 		if err != nil {
@@ -174,6 +174,4 @@ func parseExtKeyUsage(usages []x509.ExtKeyUsage) []string {
 }
 
 func readInit() {
-	readCmd.Flags().StringVar(&readPath, "file", "", "path to file to read")
-	readCmd.MarkFlagRequired("file")
 }
