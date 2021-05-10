@@ -34,7 +34,7 @@ var initCmd = &cobra.Command{
 			NotBefore:    time.Now(),
 			NotAfter:     time.Now().Add(time.Hour * 24 * time.Duration(certDays)),
 
-			KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+			KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 			BasicConstraintsValid: true,
 			IsCA:                  true,
 		}
