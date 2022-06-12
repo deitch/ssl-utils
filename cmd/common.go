@@ -57,9 +57,17 @@ func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateK
 	if err != nil {
 		return nil, nil, err
 	}
-	b, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	err = privateKeyToPEMFile(privateKey, keyfile)
 	if err != nil {
 		return nil, nil, err
+	}
+	return privateKey, publicKey, nil
+}
+
+func privateKeyToPEMFile(privateKey interface{}, keyfile string) error {
+	b, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return err
 	}
 	privateKeyPem := &pem.Block{
 		Type:  "PRIVATE KEY",
@@ -67,15 +75,31 @@ func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateK
 	}
 	f, err := os.Create(keyfile)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	defer f.Close()
 
-	err = pem.Encode(f, privateKeyPem)
+	return pem.Encode(f, privateKeyPem)
+}
+
+func certificateToPEMFile(b []byte, certfile string) error {
+	return certificatesToPEMFile([][]byte{b}, certfile)
+}
+
+func certificatesToPEMFile(bs [][]byte, certfile string) error {
+	f, err := os.Create(certfile)
 	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("failed to create certificate file %s: %v", certfile, err)
 	}
-	return privateKey, publicKey, nil
+	defer f.Close()
+	for _, b := range bs {
+		certPem := &pem.Block{Type: "CERTIFICATE", Bytes: b}
+		err := pem.Encode(f, certPem)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func signCert(template, parent *x509.Certificate, pub crypto.PublicKey, priv crypto.PrivateKey, certfile string) error {
@@ -83,18 +107,7 @@ func signCert(template, parent *x509.Certificate, pub crypto.PublicKey, priv cry
 	if err != nil {
 		return fmt.Errorf("Failed to create certificate: %s", err)
 	}
-	f, err := os.Create(certfile)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate file %s: %v", certfile, err)
-	}
-	defer f.Close()
-	certPem := &pem.Block{Type: "CERTIFICATE", Bytes: b}
-
-	err = pem.Encode(f, certPem)
-	if err != nil {
-		return fmt.Errorf("failed to encode and write certificate file %s: %v", certfile, err)
-	}
-	return nil
+	return certificateToPEMFile(b, certfile)
 }
 
 // unfortunately, the golang library does not make it easy to parse DN

@@ -13,5 +13,7 @@ require (
 	github.com/opennota/check v0.0.0-20180911053232-0c771f5545ff // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/walle/lll v1.0.1 // indirect
+	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
 	golang.org/x/tools v0.0.0-20200507205054-480da3ebd79c // indirect
+	software.sslmate.com/src/go-pkcs12 v0.2.0 // indirect
 )

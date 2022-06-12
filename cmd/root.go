@@ -18,6 +18,8 @@ func init() {
 	readInit()
 	rootCmd.AddCommand(csrCmd)
 	csrInit()
+	rootCmd.AddCommand(convertCmd)
+	convertInit()
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "print lots of output to stderr")
 }
 
