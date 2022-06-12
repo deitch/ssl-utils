@@ -48,11 +48,11 @@ var initCmd = &cobra.Command{
 
 func initInit() {
 	initCmd.Flags().StringVar(&caKeyPath, "ca-key", "", "path to save the CA key")
-	initCmd.MarkFlagRequired("ca-key")
+	_ = initCmd.MarkFlagRequired("ca-key")
 	initCmd.Flags().StringVar(&caCertPath, "ca-cert", "", "path to save the CA certificate")
-	initCmd.MarkFlagRequired("ca-cert")
+	_ = initCmd.MarkFlagRequired("ca-cert")
 	initCmd.Flags().StringVar(&subject, "subject", "", "distinguished name subject for the certificate in the format 'C=US,ST=NY,O=My Org,CN=server.myorg.com', also supports '/C=US/ST=NY/...' if starting with '/'; must specify one of --csr or --subject")
-	initCmd.MarkFlagRequired("subject")
+	_ = initCmd.MarkFlagRequired("subject")
 	initCmd.Flags().IntVar(&keySize, "key-size", 4096, "key size to use")
 	initCmd.Flags().StringVar(&keyTypeName, "key-type", "rsa", "key type to use, one of: rsa, ecdsa, ed25519")
 	initCmd.Flags().IntVar(&certDays, "days", 365, "days for certificate validity")

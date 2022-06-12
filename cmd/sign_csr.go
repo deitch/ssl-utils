@@ -70,8 +70,8 @@ var signCsrCmd = &cobra.Command{
 
 func signCsrInit() {
 	signCsrCmd.Flags().StringVar(&certPath, "cert", "", "path to save the signed certificate")
-	signCsrCmd.MarkFlagRequired("cert")
+	_ = signCsrCmd.MarkFlagRequired("cert")
 	signCsrCmd.Flags().StringVar(&csrPath, "csr", "", "path to the CSR to sign; must specify one of --csr or --subject")
-	signCsrCmd.MarkFlagRequired("csr")
+	_ = signCsrCmd.MarkFlagRequired("csr")
 	signCsrCmd.Flags().BoolVar(&approve, "approve", false, "auto-approve signing without checking, used only for CSR")
 }

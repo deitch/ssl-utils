@@ -25,5 +25,5 @@ func init() {
 
 // Execute primary function for cobra
 func Execute() {
-	rootCmd.Execute()
+	_ = rootCmd.Execute()
 }
