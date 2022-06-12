@@ -57,7 +57,7 @@ var convertPkcs12ReadCmd = &cobra.Command{
 				log.Fatalf("failed to write cert file at %s: %v", certPath, err)
 			}
 		}
-		if chain != nil && len(chain) > 0 {
+		if len(chain) > 0 {
 			bs := [][]byte{}
 			for _, cert := range chain {
 				bs = append(bs, cert.Raw)

@@ -36,7 +36,7 @@ INSTALLBIN := $(GOBINDIR)/$(BIN)
 export GO111MODULE=on
 
 LINTER ?= $(GOBINDIR)/golangci-lint
-LINTER_VERSION ?= v1.23.3
+LINTER_VERSION ?= v1.46.2
 GOFILES := $(shell find . -name '*.go')
 
 $(BINDIR):
@@ -70,14 +70,14 @@ golangci-lint: $(LINTER)
 $(LINTER):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBINDIR) $(LINTER_VERSION)
 
-golint:
-ifeq (, $(shell which golint))
-	go get -u golang.org/x/lint/golint
+revive:
+ifeq (, $(shell which revive))
+	go install github.com/mgechev/revive@latest
 endif
 
 ## Lint the files
-lint: golint golangci-lint
-	@$(LINTER) run --disable-all --enable=golint ./...
+lint: revive golangci-lint
+	@$(LINTER) run --enable=revive ./...
 
 test:
 	go test ./...

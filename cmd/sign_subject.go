@@ -65,10 +65,10 @@ var signSubjectCmd = &cobra.Command{
 
 func signSubjectInit() {
 	signSubjectCmd.Flags().StringVar(&keyPath, "key", "", "path to the save the generated key")
-	signSubjectCmd.MarkFlagRequired("key")
+	_ = signSubjectCmd.MarkFlagRequired("key")
 	signSubjectCmd.Flags().StringVar(&certPath, "cert", "", "path to save the signed certificate")
-	signSubjectCmd.MarkFlagRequired("cert")
+	_ = signSubjectCmd.MarkFlagRequired("cert")
 	signSubjectCmd.Flags().StringVar(&subject, "subject", "", "distinguished name subject for the certificate in the format 'C=US,ST=NY,O=My Org,CN=server.myorg.com', also supports '/C=US/ST=NY/...' if starting with '/'")
-	signSubjectCmd.MarkFlagRequired("subject")
+	_ = signSubjectCmd.MarkFlagRequired("subject")
 	signSubjectCmd.Flags().StringVar(&saNames, "san", "", "subject alternative names (SAN) to use, comma-separated, e.g. '127.0.0.1,www.foo.com'")
 }
