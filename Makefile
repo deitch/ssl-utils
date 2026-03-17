@@ -70,14 +70,9 @@ golangci-lint: $(LINTER)
 $(LINTER):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBINDIR) $(LINTER_VERSION)
 
-revive:
-ifeq (, $(shell which revive))
-	go install github.com/mgechev/revive@latest
-endif
-
 ## Lint the files
-lint: revive golangci-lint
-	@$(LINTER) run --enable=revive ./...
+lint: golangci-lint
+	@$(LINTER) run ./...
 
 test:
 	go test ./...
