@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -36,7 +35,7 @@ var convertPkcs12ReadCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pkcsFile := args[0]
 		// open and read the file
-		b, err := ioutil.ReadFile(pkcsFile)
+		b, err := os.ReadFile(pkcsFile)
 		if err != nil {
 			log.Fatalf("failed to read file %s: %v", pkcsFile, err)
 		}
@@ -85,7 +84,7 @@ var convertPkcs12WriteCmd = &cobra.Command{
 		)
 		// open and read the input files
 		if keyPath != "" {
-			b, err := ioutil.ReadFile(keyPath)
+			b, err := os.ReadFile(keyPath)
 			if err != nil {
 				log.Fatalf("failed to read key file %s: %v", keyPath, err)
 			}
@@ -93,7 +92,7 @@ var convertPkcs12WriteCmd = &cobra.Command{
 			if der == nil {
 				log.Fatalf("no valid PEM in key file %s: %v", keyPath, err)
 			}
-			if !(der.Type == "PRIVATE KEY" || strings.HasSuffix(der.Type, " PRIVATE KEY")) {
+			if der.Type != "PRIVATE KEY" && !strings.HasSuffix(der.Type, " PRIVATE KEY") {
 				log.Fatalf("key file %s does not contain private key", keyPath)
 			}
 			key, err = parsePrivateKey(der.Bytes)
@@ -102,7 +101,7 @@ var convertPkcs12WriteCmd = &cobra.Command{
 			}
 		}
 		if certPath != "" {
-			b, err := ioutil.ReadFile(certPath)
+			b, err := os.ReadFile(certPath)
 			if err != nil {
 				log.Fatalf("failed to read cert file %s: %v", certPath, err)
 			}
@@ -120,7 +119,7 @@ var convertPkcs12WriteCmd = &cobra.Command{
 		}
 
 		if caCertPath != "" {
-			b, err := ioutil.ReadFile(caCertPath)
+			b, err := os.ReadFile(caCertPath)
 			if err != nil {
 				log.Fatalf("failed to read CA cert chain file %s: %v", caCertPath, err)
 			}

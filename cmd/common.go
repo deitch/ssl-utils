@@ -77,7 +77,7 @@ func privateKeyToPEMFile(privateKey interface{}, keyfile string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return pem.Encode(f, privateKeyPem)
 }
@@ -91,7 +91,7 @@ func certificatesToPEMFile(bs [][]byte, certfile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create certificate file %s: %v", certfile, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	for _, b := range bs {
 		certPem := &pem.Block{Type: "CERTIFICATE", Bytes: b}
 		err := pem.Encode(f, certPem)
@@ -105,7 +105,7 @@ func certificatesToPEMFile(bs [][]byte, certfile string) error {
 func signCert(template, parent *x509.Certificate, pub crypto.PublicKey, priv crypto.PrivateKey, certfile string) error {
 	b, err := x509.CreateCertificate(rand.Reader, template, parent, pub, priv)
 	if err != nil {
-		return fmt.Errorf("Failed to create certificate: %s", err)
+		return fmt.Errorf("failed to create certificate: %s", err)
 	}
 	return certificateToPEMFile(b, certfile)
 }
@@ -183,7 +183,7 @@ func loadAndSignCert(caCertPath, caKeyPath string, template *x509.Certificate, p
 
 	err = signCert(template, caCertParsed, publicKey, caCert.PrivateKey, outCert)
 	if err != nil {
-		return fmt.Errorf("Failed to create certificate: %s", err)
+		return fmt.Errorf("failed to create certificate: %s", err)
 	}
 	return nil
 }
@@ -197,7 +197,7 @@ func saveCSR(csr *x509.CertificateRequest, key crypto.PrivateKey, filePath strin
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	pemFormat := &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: b}
 	err = pem.Encode(f, pemFormat)

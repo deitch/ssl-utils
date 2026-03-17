@@ -9,8 +9,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,7 +24,7 @@ var readCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		readPath := args[0]
 		// open and read the file
-		b, err := ioutil.ReadFile(readPath)
+		b, err := os.ReadFile(readPath)
 		if err != nil {
 			log.Fatalf("failed to read file %s: %v", readPath, err)
 		}

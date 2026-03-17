@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -31,7 +30,7 @@ var signCsrCmd = &cobra.Command{
 			template  x509.Certificate
 		)
 		// get the CSR from the file
-		csrBytes, err := ioutil.ReadFile(csrPath)
+		csrBytes, err := os.ReadFile(csrPath)
 		if err != nil {
 			log.Fatalf("unable to read CSR file %s: %v", csrPath, err)
 		}
