@@ -31,7 +31,7 @@ GOBINDIR ?= $(shell go env GOPATH)/bin
 LOCALBIN := $(BINDIR)/$(BIN)-$(OS)-$(ARCH)
 INSTALLBIN := $(GOBINDIR)/$(BIN)
 
-.PHONY: build clean fmt test fmt-check lint golint golangci-lint
+.PHONY: build clean fmt test fmt-check lint golint golangci-lint built-name
 
 export GO111MODULE=on
 
@@ -41,6 +41,9 @@ GOFILES := $(shell find . -name '*.go')
 
 $(BINDIR):
 	mkdir -p $@
+
+built-name:
+	@echo $(LOCALBIN)
 
 build: $(LOCALBIN) $(BIN)
 $(LOCALBIN): $(BINDIR)

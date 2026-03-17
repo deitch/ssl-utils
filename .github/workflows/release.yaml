@@ -7,39 +7,12 @@ on:
 
 name: Create Release
 
+permissions:
+  contents: write
+
 jobs:
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@master
-      - name: Get tag comment
-        id: get_tag_comment
-        run: echo ::set-output name=COMMENT::$(git tag -l --format='%(subject)' ${GITHUB_REF/refs\/tags\//})
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by Actions
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            ${{ steps.get_tag_comment.outputs.COMMENT }}
-          draft: false
-          prerelease: false
-      - name: save_upload_url
-        shell: bash
-        run: |
-          echo -E '${{ steps.create_release.outputs.upload_url }}' > upload_url
-      - name: Upload url for release
-        uses: actions/upload-artifact@v1
-        with:
-          name: upload_url
-          path: upload_url
   build:
-    name: Build And Release Artifacts
+    name: Build Artifacts
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -52,28 +25,41 @@ jobs:
           arch: arm64
     steps:
     - name: checkout
-      uses: actions/checkout@v1
-    - uses: actions/setup-go@v1
+      uses: actions/checkout@v6
+    - uses: actions/setup-go@v6
       with:
-        go-version: '1.13.5' # The Go version to download (if necessary) and use.
+        go-version-file: 'go.mod' # The Go version to download (if necessary) and use.
     - name: build
       run: make build OS=${{ matrix.os }} ARCH=${{ matrix.arch }}
-    - name: Download upload_url
-      uses: actions/download-artifact@v1
-      with:
-        name: upload_url
-    - name: Set upload_url
-      id: upload_url
+    - name: Get Build Path
+      # We run the command and write it to the $GITHUB_OUTPUT buffer
+      id: vars
       run: |
-          echo ::set-output name=upload_url::$(cat upload_url/upload_url)
-    - name: Upload Release Assets
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        echo "BINARY_PATH=$(make built-name OS=${{ matrix.os }} ARCH=${{ matrix.arch }})" >> $GITHUB_OUTPUT
+    - name: upload
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ steps.upload_url.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`
-        asset_path: ./dist/ca-${{ matrix.os }}-${{ matrix.arch }}
-        asset_name: ca-${{ matrix.os }}-${{ matrix.arch }}
-        asset_content_type: application/octet-stream
-
+        # Save each build under a unique name in the cloud storage
+        name: ca-${{ matrix.os }}-${{ matrix.arch }}
+        path: ${{ steps.vars.outputs.BINARY_PATH }}
+        if-no-files-found: error        
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # downloads ALL artifacts from the workflow into 'dist' folder
+          path: dist
+          pattern: ca-*
+          merge-multiple: true
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          # This tells the action to grab everything in the dist folder
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by Actions
