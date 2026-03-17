@@ -35,10 +35,14 @@ var signCsrCmd = &cobra.Command{
 			log.Fatalf("unable to read CSR file %s: %v", csrPath, err)
 		}
 		block, _ := pem.Decode(csrBytes)
+		if block == nil {
+			log.Fatalf("unable to decode PEM from CSR file %s", csrPath)
+		}
 		csr, err := x509.ParseCertificateRequest(block.Bytes)
 		if err != nil {
 			log.Fatalf("unable to parse CSR file %s: %v", csrPath, err)
 		}
+		publicKey = csr.PublicKey
 		template = x509.Certificate{
 			SerialNumber: big.NewInt(1),
 			Subject:      csr.Subject,
