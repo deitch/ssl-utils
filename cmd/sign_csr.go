@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -56,6 +57,7 @@ var signCsrCmd = &cobra.Command{
 			reader := bufio.NewReader(os.Stdin)
 			fmt.Printf("Approve certificate for %#v (y/n)? ", csr.Subject)
 			text, _ := reader.ReadString('\n')
+			text = strings.TrimSpace(text)
 			if text != "Y" && text != "y" {
 				log.Fatal("Not approved!")
 			}
