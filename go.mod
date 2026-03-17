@@ -1,6 +1,6 @@
 module github.com/deitch/ssl-tools
 
-go 1.17
+go 1.25.0
 
 require (
 	github.com/spf13/cobra v0.0.5
@@ -10,5 +10,5 @@ require (
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.3 // indirect
-	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
 )
