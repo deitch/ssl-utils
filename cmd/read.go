@@ -86,6 +86,8 @@ func printCert(cert *x509.Certificate) {
 		fmt.Printf("\tName Constraints Critical: %v\n", cert.PermittedDNSDomainsCritical)
 		fmt.Printf("\tPermitted DNS Domains: %v\n", cert.PermittedDNSDomains)
 		fmt.Printf("\tExcluded DNS Domains: %v\n", cert.ExcludedDNSDomains)
+		fmt.Printf("\tPermitted IP Ranges: %v\n", cert.PermittedIPRanges)
+		fmt.Printf("\tExcluded IP Ranges: %v\n", cert.ExcludedIPRanges)
 	}
 	fmt.Printf("\tSAN: %v %v\n", cert.DNSNames, cert.IPAddresses)
 }

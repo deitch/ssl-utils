@@ -349,7 +349,7 @@ func TestIntermediateCLI(t *testing.T) {
 	runCLI(t, false, "init", "--subject", "CN=Root", "--ca-key", path("root.key"), "--ca-cert", path("root.pem"), "--key-type", "ed25519", "--days", "3650")
 	rootArgs := []string{"--ca-key", path("root.key"), "--ca-cert", path("root.pem"), "--key-type", "ed25519"}
 	create := append([]string{"sign", "intermediate"}, rootArgs...)
-	create = append(create, "--subject", "CN=Intermediate", "--key", path("intermediate.key"), "--cert", path("intermediate.pem"), "--permit-dns", "example.com", "--exclude-dns", "restricted.example.com", "--days", "730")
+	create = append(create, "--subject", "CN=Intermediate", "--key", path("intermediate.key"), "--cert", path("intermediate.pem"), "--permit-name", "example.com", "--exclude-name", "restricted.example.com", "--days", "730")
 	runCLI(t, false, create...)
 	intermediate, root := readTestCert(t, path("intermediate.pem")), readTestCert(t, path("root.pem"))
 	if err := intermediate.CheckSignatureFrom(root); err != nil {
@@ -396,7 +396,7 @@ func TestIntermediateCLI(t *testing.T) {
 	}
 	writeTestCSR(t, path("ca-request.pem"), nil, false)
 	args := append([]string{"sign", "intermediate"}, rootArgs...)
-	args = append(args, "--csr", path("ca-request.pem"), "--cert", path("csr-ca.pem"), "--permit-dns", "example.org", "--approve")
+	args = append(args, "--csr", path("ca-request.pem"), "--cert", path("csr-ca.pem"), "--permit-name", "example.org", "--approve")
 	runCLI(t, false, args...)
 	if !readTestCert(t, path("csr-ca.pem")).IsCA {
 		t.Fatal("CSR was not issued as a CA")
@@ -405,7 +405,7 @@ func TestIntermediateCLI(t *testing.T) {
 	// mandatory constraint/issuer flags must all fail at the CLI boundary.
 	runCLI(t, true, "sign", "certificate", "--ca-key", path("intermediate.key"), "--ca-cert", path("intermediate.pem"), "--subject", "CN=Server", "--san", "api.example.com", "--key", path("missing-root.key"), "--cert", path("missing-root.pem"), "--key-type", "ed25519")
 	args = append([]string{"sign", "intermediate"}, issuerArgs...)
-	args = append(args, "--subject", "CN=Forbidden", "--key", path("forbidden.key"), "--cert", path("forbidden.pem"), "--permit-dns", "example.com")
+	args = append(args, "--subject", "CN=Forbidden", "--key", path("forbidden.key"), "--cert", path("forbidden.pem"), "--permit-name", "example.com")
 	runCLI(t, true, args...)
 	if _, err := os.Stat(path("forbidden.key")); !os.IsNotExist(err) {
 		t.Fatal("rejected delegation wrote a key")
@@ -426,13 +426,13 @@ func TestIntermediateCLIOptionsAndChainBundle(t *testing.T) {
 	base := []string{"sign", "intermediate", "--ca-key", path("root.key"), "--ca-cert", path("root.pem"), "--key-type", "ecdsa", "--subject", "CN=Parent", "--key", path("parent.key"), "--cert", path("parent.pem")}
 	for _, flags := range [][]string{
 		nil,
-		{"--permit-dns", "*.example.com"},
-		{"--permit-dns", "example.com."},
-		{"--permit-dns", "127.0.0.1"},
-		{"--permit-dns", "example.com", "--max-path-len", "-1"},
-		{"--permit-dns", "example.com", "--days", "0"},
-		{"--permit-dns", "example.com", "--days", "-1"},
-		{"--permit-dns", "example.com", "--csr", path("missing.csr")},
+		{"--permit-name", "*.example.com"},
+		{"--permit-name", "example.com."},
+		{"--permit-name", "127.0.0.1/33"},
+		{"--permit-name", "example.com", "--max-path-len", "-1"},
+		{"--permit-name", "example.com", "--days", "0"},
+		{"--permit-name", "example.com", "--days", "-1"},
+		{"--permit-name", "example.com", "--csr", path("missing.csr")},
 	} {
 		args := append(append([]string{}, base...), flags...)
 		runCLI(t, true, args...)
@@ -442,7 +442,7 @@ func TestIntermediateCLIOptionsAndChainBundle(t *testing.T) {
 			}
 		}
 	}
-	args := append(append([]string{}, base...), "--permit-dns", "example.com", "--permit-dns", "example.org", "--max-path-len", "1")
+	args := append(append([]string{}, base...), "--permit-name", "example.com", "--permit-name", "example.org", "--max-path-len", "1")
 	runCLI(t, false, args...)
 	parent := readTestCert(t, path("parent.pem"))
 	if len(parent.PermittedDNSDomains) != 2 || parent.MaxPathLen != 1 {
@@ -455,7 +455,7 @@ func TestIntermediateCLIOptionsAndChainBundle(t *testing.T) {
 	if _, err := os.Stat(path("new.pem")); !os.IsNotExist(err) {
 		t.Fatal("output failure did not roll back new certificate")
 	}
-	runCLI(t, false, "sign", "intermediate", "--ca-key", path("parent.key"), "--ca-cert", path("parent.pem"), "--chain", path("root.pem"), "--subject", "CN=Child", "--key", path("child.key"), "--cert", path("child.pem"), "--key-type", "ed25519", "--permit-dns", "team.example.com")
+	runCLI(t, false, "sign", "intermediate", "--ca-key", path("parent.key"), "--ca-cert", path("parent.pem"), "--chain", path("root.pem"), "--subject", "CN=Child", "--key", path("child.key"), "--cert", path("child.pem"), "--key-type", "ed25519", "--permit-name", "team.example.com")
 	child := readTestCert(t, path("child.pem"))
 	if err := certificatesToPEMFile([][]byte{child.Raw, parent.Raw, root.chain[0].Raw}, path("bundle.pem")); err != nil {
 		t.Fatal(err)
