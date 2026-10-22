@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"crypto"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"log"
@@ -138,12 +137,12 @@ var convertPkcs12WriteCmd = &cobra.Command{
 		}
 		// now write the pkcs12 file
 		if key != nil {
-			pkcs12Bytes, err = pkcs12.Encode(rand.Reader, key, cert, chain, password)
+			pkcs12Bytes, err = pkcs12.Modern.Encode(key, cert, chain, password)
 			if err != nil {
 				log.Fatalf("failed to pkcs12 encode key, cert and chain: %v", err)
 			}
 		} else {
-			pkcs12Bytes, err = pkcs12.EncodeTrustStore(rand.Reader, chain, password)
+			pkcs12Bytes, err = pkcs12.Modern.EncodeTrustStore(chain, password)
 			if err != nil {
 				log.Fatalf("failed to pkcs12 encode chain: %v", err)
 			}
