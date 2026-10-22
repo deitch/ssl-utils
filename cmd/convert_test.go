@@ -191,3 +191,100 @@ func TestPKCS12ImportFailurePreservesOutputs(t *testing.T) {
 		})
 	}
 }
+
+func TestPKCS12ExportRequiresCertificateWithKey(t *testing.T) {
+	d := t.TempDir()
+	keyPath, output := filepath.Join(d, "key.pem"), filepath.Join(d, "existing.p12")
+	_, key := testKey(t)
+	if err := privateKeyToPEMFile(key, keyPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(output, []byte("existing output"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCLI(t, true, "convert", "pkcs12", "write", output, "--key", keyPath)
+	if !strings.Contains(out, "--cert is required when --key is supplied") || strings.Contains(out, "panic:") {
+		t.Fatalf("expected a missing-certificate error, got: %s", out)
+	}
+	got, err := os.ReadFile(output)
+	if err != nil || string(got) != "existing output" {
+		t.Fatal("invalid export changed existing output")
+	}
+}
+
+func TestPKCS12TrustStoreImportCLI(t *testing.T) {
+	root, otherRoot := testRoot(t), testRoot(t)
+	for _, tc := range []struct {
+		name, password string
+		certs          []*x509.Certificate
+		encoder        *pkcs12.Encoder
+	}{
+		{"CLI round trip", "test-password", root.chain, nil},
+		{"multiple certificates", "test-password", []*x509.Certificate{root.chain[0], otherRoot.chain[0]}, pkcs12.Modern},
+		{"empty password", "", root.chain, pkcs12.Modern},
+		{"passwordless", "", root.chain, pkcs12.Passwordless},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := t.TempDir()
+			path := func(name string) string { return filepath.Join(d, name) }
+			if tc.encoder == nil {
+				if err := certificateToPEMFile(root.chain[0].Raw, path("root.pem")); err != nil {
+					t.Fatal(err)
+				}
+				runCLI(t, false, "convert", "pkcs12", "write", path("trust.p12"), "--ca", path("root.pem"), "--password", tc.password)
+			} else {
+				encoded, err := tc.encoder.EncodeTrustStore(tc.certs, tc.password)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path("trust.p12"), encoded, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Trust stores have no private key or leaf certificate. Supplying those
+			// output flags must not cause their existing files to be modified.
+			for _, file := range []string{"key.pem", "leaf.pem"} {
+				if err := os.WriteFile(path(file), []byte("existing output"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			runCLI(t, false, "convert", "pkcs12", "read", path("trust.p12"), "--ca", path("trusted.pem"), "--password", tc.password, "--key", path("key.pem"), "--cert", path("leaf.pem"))
+			b, err := os.ReadFile(path("trusted.pem"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			certs, err := parseCertificates(b)
+			if err != nil || len(certs) != len(tc.certs) {
+				t.Fatalf("trust store lost certificates: %v", err)
+			}
+			for n, cert := range certs {
+				if !bytes.Equal(cert.Raw, tc.certs[n].Raw) {
+					t.Fatal("trusted certificate changed during import")
+				}
+			}
+			for _, file := range []string{"key.pem", "leaf.pem"} {
+				b, err := os.ReadFile(path(file))
+				if err != nil || string(b) != "existing output" {
+					t.Fatalf("trust store import modified %s", file)
+				}
+			}
+			if out := runCLI(t, true, "convert", "pkcs12", "read", path("trust.p12"), "--password", tc.password); !strings.Contains(out, "--ca is required for trust store output") {
+				t.Fatalf("missing trust store output path was not reported: %s", out)
+			}
+			if tc.password != "" {
+				before, err := os.ReadFile(path("trusted.pem"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				out := runCLI(t, true, "convert", "pkcs12", "read", path("trust.p12"), "--ca", path("trusted.pem"), "--password", "wrong-password")
+				if !strings.Contains(out, "failed to decode file") {
+					t.Fatalf("expected password error: %s", out)
+				}
+				after, err := os.ReadFile(path("trusted.pem"))
+				if err != nil || !bytes.Equal(before, after) {
+					t.Fatal("wrong password changed trust store output")
+				}
+			}
+		})
+	}
+}

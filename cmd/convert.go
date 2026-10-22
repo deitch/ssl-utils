@@ -29,7 +29,7 @@ var convertPkcs12Cmd = &cobra.Command{
 var convertPkcs12ReadCmd = &cobra.Command{
 	Use:   "read <pkcs12 file>",
 	Short: "read a pkcs12 file and output its component parts as pem",
-	Long:  `read a pkcs12 file and output its component parts as pem`,
+	Long:  `Read a PKCS#12 key bundle or trust store as PEM. Trust stores write all trusted certificates to --ca; --key and --cert outputs are unused.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		pkcsFile := args[0]
@@ -42,7 +42,14 @@ var convertPkcs12ReadCmd = &cobra.Command{
 		// read the pkcs12 file
 		key, cert, chain, err := pkcs12.DecodeChain(b, password)
 		if err != nil {
-			log.Fatalf("failed to decode file %s: %v", pkcsFile, err)
+			trusted, trustErr := pkcs12.DecodeTrustStore(b, password)
+			if trustErr != nil {
+				log.Fatalf("failed to decode file %s as a key bundle (%v) or trust store (%v)", pkcsFile, err, trustErr)
+			}
+			if caCertPath == "" {
+				log.Fatal("--ca is required for trust store output")
+			}
+			key, cert, chain = nil, nil, trusted
 		}
 		// write the outputs
 		if key != nil {
@@ -70,10 +77,13 @@ var convertPkcs12ReadCmd = &cobra.Command{
 var convertPkcs12WriteCmd = &cobra.Command{
 	Use:   "write <pkcs12 file>",
 	Short: "write a pkcs12 file from pem inputs",
-	Long:  `write a pkcs12 file from pem inputs`,
+	Long:  `Write a PKCS#12 key bundle using --key and --cert, or a trust store using --ca. Output uses Modern encryption.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		pkcsFile := args[0]
+		if keyPath != "" && certPath == "" {
+			log.Fatal("--cert is required when --key is supplied")
+		}
 		var (
 			key         crypto.PrivateKey
 			cert        *x509.Certificate

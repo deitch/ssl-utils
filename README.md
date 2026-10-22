@@ -187,6 +187,27 @@ ca read /path/to/file
 
 It will try to determine if the file is a certificate, a private key or a certificate request, based on its PEM-encoding.
 
+### Convert PKCS#12 files
+
+Export a key bundle using `--key` and `--cert` together, optionally with a CA
+certificate supplied through `--ca`. Exports use the library's Modern encryption
+profile. Supplying `--key` without `--cert` returns an error.
+
+```sh
+ca convert pkcs12 write server.p12 --key server.key --cert server.pem --ca root.pem --password example-password
+ca convert pkcs12 read server.p12 --key extracted.key --cert extracted.pem --ca extracted-ca.pem --password example-password
+```
+
+For certificate-only trust stores, use `--ca` for both export and import. Import
+writes all trusted certificates into that PEM file; it leaves `--key` and `--cert`
+outputs untouched because a trust store contains neither a private key nor a
+leaf certificate.
+
+```sh
+ca convert pkcs12 write trust.p12 --ca root.pem --password example-password
+ca convert pkcs12 read trust.p12 --ca trusted.pem --password example-password
+```
+
 ## Building
 
 ssl-tools is built with golang. If you have golang installed, just do:
@@ -206,3 +227,5 @@ By default, it builds for your local OS and ARCH. To cross-compile:
 ```
 make build OS=<target> ARCH=<target>
 ```
+
+Run the tests, including race detection, with `make test`.
