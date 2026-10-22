@@ -21,8 +21,15 @@ dependency.
   writing, subject parsing, CA loading, signing, and key-type validation.
 - `cmd/init.go`: `ca init`, creating a key and self-signed CA certificate.
 - `cmd/csr.go`: `ca csr`, creating a private key and CSR with DNS/IP SANs.
-- `cmd/sign.go`: signing parent command and shared signing flags.
-- `cmd/sign_subject.go`: `ca sign subject`, generating a key and issuing a
+- `cmd/sign.go`: signing parent command, shared signing flags, and input-mode
+  validation shared by leaf and intermediate issuance.
+- `cmd/sign_certificate.go`: `ca sign certificate`, dispatching subject/key or
+  CSR mode through the existing leaf issuance paths.
+- `cmd/sign_intermediate.go`: domain-constrained intermediate issuance from a new
+  key/subject or an existing CSR; exclusive output creation.
+- `cmd/issuer.go`: ordered issuer-chain validation, certificate templates, CSR
+  signature checks, delegation policy, DNS constraints, and post-sign verification.
+- `cmd/sign_subject.go`: helper for generating a key and issuing a leaf
   certificate directly from a subject and optional SANs.
 - `cmd/sign_csr.go`: issuing a certificate using an existing CSR's public key,
   subject, and DNS/IP SANs, with an interactive approval or `--approve`.
@@ -49,21 +56,20 @@ make build
 `make build OS=linux ARCH=arm64`; `make built-name` prints the target path.
 `make install` writes to `GOBINDIR`, defaulting to `$(go env GOPATH)/bin`.
 
-The Makefile's binary targets do not track Go source prerequisites. After code
-changes, use `go build -o /tmp/ssl-tools-ca .` to ensure a fresh build, or remove
-the relevant generated binary before running `make build` again. `make clean`
-only removes the root `ca` link; it does not clear `dist/`.
+The Makefile's binary targets track Go sources and module files. `make clean`
+only removes the root `ca` link; it does not clear `dist/`. For a disposable
+build without repository artifacts, use `go build -o /tmp/ssl-tools-ca .`.
 
 CI also runs golangci-lint v2.10. The local `make lint` installer defaults to
 v1.46.2, so the local and CI linter versions differ. Avoid inadvertently
 installing the old version when reproducing a CI issue.
 
-There are currently no `_test.go` files. A passing `go test ./...` checks package
-compilation but provides no behavioral coverage. Add focused regression tests
-for behavior changes, using temporary directories and freshly generated test
-keys. For command paths that call `log.Fatal` or `os.Exit`, use subprocess tests
-or test extracted helpers. Global Cobra commands and flag variables retain state
-within a process; do not assume command invocations are isolated or parallel-safe.
+`cmd/issuer_test.go` covers intermediate creation, domain/delegation restrictions,
+chain verification, and CLI behavior. Add focused regression tests for behavior
+changes using temporary directories and freshly generated keys. CLI tests use a
+subprocess of the test binary so Cobra state and process exits are isolated.
+Global Cobra commands and flag variables retain state within a process; do not
+assume command invocations are isolated or parallel-safe.
 
 For certificate changes, verify the generated artifacts by parsing them and
 checking signatures, SANs, usages, CA constraints, validity, and key matching as
@@ -97,25 +103,34 @@ These describe the current implementation, not behavior to reproduce in new code
 Verify them when working on the affected command and keep unrelated fixes scoped
 separately.
 
-- The README shows `ca sign csr`, but `signCsrCmd.Use` is `"sign"`, making the
-  registered path `ca sign sign`. The README's `ca read --file ...` is also stale:
-  the implementation takes a positional file. CSR signing has no `--key` or
-  `--san` flags; it reuses the CSR's public key and SANs.
-- `--days` is registered only on `init`; signing uses the shared `certDays`
-  variable with its initialized default. Standalone `csr` exposes neither
-  `--key-type` nor `--key-size` and uses the initialized RSA defaults.
-- All issued certificates currently use serial number 1. CSR signing parses
-  requests without calling `CheckSignature()`. Subject-issued certificates allow
-  server and client auth, while CSR-issued certificates allow server auth only.
+- Leaf signing is `ca sign certificate`. Both it and `ca sign intermediate`
+  require exactly one input mode: `--csr`, or `--subject` plus `--key`. CSR mode
+  rejects `--subject`, `--key`, and leaf `--san` overrides, including empty flags.
+  Identities come from the signed CSR. The only signing subcommands are
+  `certificate` and `intermediate`; the former CSR/subject commands were removed.
+- Signing supports `--days` and caps expiry at all issuers' expiry. Standalone
+  `csr` still exposes neither `--key-type` nor `--key-size` and uses RSA defaults.
+- Intermediate signing requires the complete ordered chain to a self-signed root,
+  either bundled in `--ca-cert` or completed with `--chain`. Do not fall back to
+  trusting an intermediate when ancestors are missing. Self-issued rollover and
+  duplicate CA subjects are deliberately unsupported.
+- Intermediate DNS constraints are critical, permitted domains are mandatory, and
+  the default path length is explicitly zero. Child permissions cannot widen an
+  ancestor's scope; exclusions are inherited. DNS-constrained issuance requires
+  leaf DNS SANs and refuses IP/email/URI identities. Wildcard/exclusion overlaps
+  are conservatively rejected. DNS constraints do not constrain arbitrary CNs.
+- Subject-issued leaf certificates allow server and client auth, while CSR-issued
+  leaf certificates allow server auth only. Each requested EKU is checked against
+  the complete chain before output. CSR signatures are verified before issuance.
 - Subject parsing accepts comma-separated or leading-slash DNs and supports
-  `C`, `O`, `OU`, `ST`, `L`, and `CN`. Malformed recognized components lacking
-  `=` can panic; separator escaping is handled only partially.
-- PEM output uses `os.Create`, so it can overwrite existing files and private-key
-  permissions depend on the process umask. PKCS#12 output requests mode `0600`
-  when creating a new file.
+  `C`, `O`, `OU`, `ST`, `L`, and `CN`. Separator escaping is handled only partially.
+- Existing root/CSR/leaf PEM workflows can overwrite output files. Intermediate
+  output paths must not exist; rejected intermediate policy writes no outputs.
+  New private-key and PKCS#12 files request mode `0600`. Existing file permissions
+  are not changed when legacy workflows overwrite an existing file.
 - PEM inspection reads only the first block. PKCS#12 writing likewise reads only
   the first certificate from the supplied CA PEM file, despite accepting a
   chain file in its help text.
-- Command handlers commonly terminate via `log.Fatal`; `Execute()` discards
-  Cobra's returned error, so CLI failures do not consistently yield nonzero exit
-  status. The `--verbose` flag is registered but currently unused.
+- Legacy command handlers commonly terminate via `log.Fatal`; signing commands
+  return errors via `RunE`, and `Execute()` exits nonzero on Cobra errors.
+  The `--verbose` flag is registered but currently unused.
