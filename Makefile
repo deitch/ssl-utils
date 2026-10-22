@@ -46,14 +46,14 @@ built-name:
 	@echo $(LOCALBIN)
 
 build: $(LOCALBIN) $(BIN)
-$(LOCALBIN): $(BINDIR)
+$(LOCALBIN): $(GOFILES) go.mod go.sum | $(BINDIR)
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -o $@ .
-$(BIN):
+$(BIN): $(LOCALBIN)
 	@if [ "$(OS)" = "$(BUILDOS)" -a "$(ARCH)" = "$(BUILDARCH)" ]; then rm -f $@; ln -s $(LOCALBIN) $@; fi
 	@echo $@ linked to binary $(LOCALBIN)
 
 install: $(INSTALLBIN)
-$(INSTALLBIN):
+$(INSTALLBIN): $(GOFILES) go.mod go.sum
 	CGO_ENABLED=0 go build -o $@
 
 clean:

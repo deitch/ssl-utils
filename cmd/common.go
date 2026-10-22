@@ -7,12 +7,12 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,6 +31,17 @@ const (
 )
 
 func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateKey, crypto.PublicKey, error) {
+	privateKey, publicKey, err := generatePrivateKey(keyType, size)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := privateKeyToPEMFile(privateKey, keyfile); err != nil {
+		return nil, nil, err
+	}
+	return privateKey, publicKey, nil
+}
+
+func generatePrivateKey(keyType KeyType, size int) (crypto.PrivateKey, crypto.PublicKey, error) {
 	var (
 		privateKey, publicKey interface{}
 		err                   error
@@ -41,7 +52,9 @@ func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateK
 		rsaPrivateKey, perr := rsa.GenerateKey(reader, size)
 		privateKey = rsaPrivateKey
 		err = perr
-		publicKey = rsaPrivateKey.Public()
+		if perr == nil {
+			publicKey = rsaPrivateKey.Public()
+		}
 	case Ed25519:
 		publicKey, privateKey, err = ed25519.GenerateKey(reader)
 	case ECDSA:
@@ -49,15 +62,13 @@ func generateKeyPair(keyType KeyType, size int, keyfile string) (crypto.PrivateK
 		ecdsaPrivateKey, perr := ecdsa.GenerateKey(curve, reader)
 		privateKey = ecdsaPrivateKey
 		err = perr
-		publicKey = ecdsaPrivateKey.Public()
+		if perr == nil {
+			publicKey = ecdsaPrivateKey.Public()
+		}
 	default:
 		return nil, nil, fmt.Errorf("unknown key type: %v", keyType)
 	}
 
-	if err != nil {
-		return nil, nil, err
-	}
-	err = privateKeyToPEMFile(privateKey, keyfile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -73,7 +84,7 @@ func privateKeyToPEMFile(privateKey interface{}, keyfile string) error {
 		Type:  "PRIVATE KEY",
 		Bytes: b,
 	}
-	f, err := os.Create(keyfile)
+	f, err := os.OpenFile(keyfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -148,6 +159,9 @@ func parseSubject(subject string) (*pkix.Name, error) {
 func populateName(name *pkix.Name, rdn []rune) error {
 	// split on the first =
 	parts := strings.SplitN(string(rdn), "=", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return fmt.Errorf("invalid RDN: %s", string(rdn))
+	}
 	switch parts[0] {
 	case "C":
 		name.Country = []string{parts[1]}
@@ -168,24 +182,15 @@ func populateName(name *pkix.Name, rdn []rune) error {
 }
 
 func loadAndSignCert(caCertPath, caKeyPath string, template *x509.Certificate, publicKey crypto.PublicKey, outCert string) error {
-	// read the CA key and certificate
-	caCert, err := tls.LoadX509KeyPair(caCertPath, caKeyPath)
+	issuer, err := loadIssuer(caCertPath, caKeyPath, chainPath)
 	if err != nil {
-		return fmt.Errorf("failed to read CA cert/key: %v", err)
+		return err
 	}
-	if len(caCert.Certificate) < 1 {
-		return fmt.Errorf("unvalid CA certificate missing bytes")
-	}
-	caCertParsed, err := x509.ParseCertificate(caCert.Certificate[0])
+	b, err := issuer.issue(template, publicKey)
 	if err != nil {
-		return fmt.Errorf("failed to parse CA cert: %v", err)
+		return err
 	}
-
-	err = signCert(template, caCertParsed, publicKey, caCert.PrivateKey, outCert)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate: %s", err)
-	}
-	return nil
+	return certificateToPEMFile(b, outCert)
 }
 
 func saveCSR(csr *x509.CertificateRequest, key crypto.PrivateKey, filePath string) error {
@@ -219,4 +224,55 @@ func validateKeyType(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stderr, "unknown key type: %s", keyTypeName)
 		os.Exit(1)
 	}
+}
+
+func writeNewPrivateKey(key crypto.PrivateKey, path string) error {
+	b, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	if err := pem.Encode(f, &pem.Block{Type: "PRIVATE KEY", Bytes: b}); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	return nil
+}
+
+func writeCertificate(f *os.File, der []byte) error {
+	return pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: der})
+}
+
+// Check both path spelling and existing file identity (including symlinks and
+// hard links) before any signing output can overwrite issuer material.
+func checkOutputPaths(outputs, inputs []string) error {
+	for n, output := range outputs {
+		outputPath, err := filepath.Abs(output)
+		if err != nil {
+			return err
+		}
+		outputInfo, _ := os.Stat(output)
+		for _, input := range append(append([]string{}, inputs...), outputs[:n]...) {
+			if input == "" {
+				continue
+			}
+			inputPath, err := filepath.Abs(input)
+			if err != nil {
+				return err
+			}
+			inputInfo, _ := os.Stat(input)
+			if outputPath == inputPath || outputInfo != nil && inputInfo != nil && os.SameFile(outputInfo, inputInfo) {
+				return fmt.Errorf("output %q must differ from inputs and other outputs", output)
+			}
+		}
+	}
+	return nil
 }

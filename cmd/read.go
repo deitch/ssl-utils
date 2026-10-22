@@ -81,6 +81,12 @@ func printCert(cert *x509.Certificate) {
 	fmt.Printf("\tKey Usage: %s\n", strings.Join(parseKeyUsage(cert.KeyUsage), ","))
 	fmt.Printf("\tExtended Key Usage: %s\n", strings.Join(parseExtKeyUsage(cert.ExtKeyUsage), ","))
 	fmt.Printf("\tCA: %v\n", cert.IsCA)
+	if cert.IsCA {
+		fmt.Printf("\tMax Path Length: %d\n", cert.MaxPathLen)
+		fmt.Printf("\tName Constraints Critical: %v\n", cert.PermittedDNSDomainsCritical)
+		fmt.Printf("\tPermitted DNS Domains: %v\n", cert.PermittedDNSDomains)
+		fmt.Printf("\tExcluded DNS Domains: %v\n", cert.ExcludedDNSDomains)
+	}
 	fmt.Printf("\tSAN: %v %v\n", cert.DNSNames, cert.IPAddresses)
 }
 func printKey(rawKey crypto.PrivateKey) {

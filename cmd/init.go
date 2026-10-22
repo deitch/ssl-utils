@@ -3,8 +3,6 @@ package cmd
 import (
 	"crypto/x509"
 	"log"
-	"math/big"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -28,18 +26,13 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("error parsing the subject: %v", err)
 		}
-		template := x509.Certificate{
-			SerialNumber: big.NewInt(1),
-			Subject:      *name,
-			NotBefore:    time.Now(),
-			NotAfter:     time.Now().Add(time.Hour * 24 * time.Duration(certDays)),
-
-			KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-			BasicConstraintsValid: true,
-			IsCA:                  true,
+		template, err := newCertificateTemplate(*name, certDays)
+		if err != nil {
+			log.Fatal(err)
 		}
-
-		err = signCert(&template, &template, publicKey, privateKey, caCertPath)
+		template.KeyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+		template.IsCA = true
+		err = signCert(template, template, publicKey, privateKey, caCertPath)
 		if err != nil {
 			log.Fatalf("Failed to create certificate: %s", err)
 		}
