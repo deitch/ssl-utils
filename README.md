@@ -99,7 +99,7 @@ ca init --subject "CN=Example Root CA" \
 ca sign intermediate --subject "CN=Example Issuing CA" \
   --ca-key root/key.pem --ca-cert root/cert.pem \
   --key intermediate/key.pem --cert intermediate/cert.pem \
-  --permit-dns example.com --exclude-dns restricted.example.com \
+  --permit-name example.com --exclude-name restricted.example.com \
   --max-path-len 0 --days 730
 
 ca sign certificate --subject "CN=api.example.com" --san api.example.com \
@@ -119,28 +119,52 @@ the intended root for the hierarchy's constraints to apply.
 `ca sign certificate` also accepts `--chain` and uses the same issuer-policy checks.
 `--days` defaults to 365 for signing; certificate expiry is capped at the earliest
 expiry in the issuer chain. Each new certificate receives a random serial number.
-`ca read intermediate/cert.pem` displays CA status, path length, and DNS constraints.
+`ca read intermediate/cert.pem` displays CA status, path length, and DNS/IP constraints.
 
-Intermediate creation requires at least one `--permit-dns`. Both `--permit-dns`
-and `--exclude-dns` accept repeated flags or comma-separated lists. Constraints
+Intermediate creation requires at least one permitted DNS domain in
+`--permit-name`. Both `--permit-name` and `--exclude-name` accept mixed DNS names,
+bare IP addresses, and CIDRs, using repeated flags or comma-separated lists. The
+CLI automatically separates DNS and IP constraints when encoding the certificate.
+Constraints
 are encoded in a **critical X.509 Name Constraints extension**:
 
 - `example.com` permits the apex and all its subdomains; `.example.com` permits
   subdomains only (supported by Go's verifier). Use ASCII/punycode domains without
-  trailing dots. Constraint values cannot contain wildcards or IP addresses.
+  trailing dots. DNS constraint values cannot contain wildcards.
 - Exclusions override permissions. Every DNS SAN is checked; combining an allowed
   name with an outside-domain or excluded name fails. Wildcard leaf SANs are
   supported, but any overlap with an excluded subtree is conservatively rejected.
-- DNS-constrained issuers require DNS SANs on leaf certificates and refuse IP,
-  email, and URI SAN issuance. This CLI does not currently offer separate policies
-  for those identity types. The DNS extension itself constrains DNS identities;
-  it does not constrain arbitrary subject common names or other identity types
-  when certificates are issued by other software. Use SAN-aware TLS clients.
+- Leaf certificates require DNS and/or explicitly permitted IP SANs. IP issuance
+  requires an IP address or CIDR in `--permit-name`; DNS-only intermediates still refuse
+  IP SANs. Email and URI identities remain unsupported for constrained issuance.
+  DNS/IP constraints do not constrain arbitrary subject common names, email, or
+  URI identities issued by other software. Use SAN-aware TLS clients.
 - `--max-path-len 0` is the default and prevents further intermediate delegation.
   Set a positive limit explicitly to allow more CA levels. Each child must fit
   all ancestors' remaining depth and narrow or retain their permitted DNS scope;
   ancestor DNS exclusions are inherited. Intermediate subjects must differ from
   all ancestor subjects; self-issued rollover chains are not supported.
+
+For example, `--permit-name esi.bak,127.0.0.1,::1` allows DNS names such as
+`vault.hq.esi.bak` plus both loopback addresses. A bare IPv4 address becomes a
+`/32` constraint; a bare IPv6 address becomes a `/128` constraint. Then issue the server certificate with
+`--san vault.hq.esi.bak,127.0.0.1` (and `::1` if needed).
+
+Use CIDRs for broader IP ranges, for example `--permit-name esi.bak,10.0.0.0/8`
+and `--exclude-name restricted.esi.bak,10.1.0.0/16`. Exclusions take precedence;
+child CAs cannot widen ancestor ranges and inherit ancestor exclusions.
+Host bits in a CIDR are normalized to its network; IPv4-mapped IPv6 CIDRs are
+rejected. DNS and IP permissions apply independently, and every SAN must pass.
+
+An existing DNS-only intermediate must be reissued by its parent to enable IPs;
+a child cannot add IP permissions that its DNS-constrained ancestor lacks. Use
+an existing intermediate CSR with `ca sign intermediate --csr ... --permit-name
+esi.bak,127.0.0.1 ...` to retain its private key, or generate a new
+key/certificate pair. Write to new output paths: intermediate issuance refuses
+to overwrite existing files. Keep the same required DNS scope, exclusions,
+validity, and path-length policy when reissuing. The permitted IP ranges are
+encoded in the intermediate certificate, so chain-verifying clients also reject
+IP SANs outside those ranges.
 
 A signing intermediate needs its **complete public chain to a self-signed root**.
 Use `--chain` for ancestors in order: immediate parent first, root last. For a
@@ -167,7 +191,7 @@ ca csr --subject "CN=Example Issuing CA" \
 # On the root-signing machine:
 ca sign intermediate --csr intermediate/request.pem \
   --ca-key root/key.pem --ca-cert root/cert.pem \
-  --cert intermediate/cert.pem --permit-dns example.com --days 730 --approve
+  --cert intermediate/cert.pem --permit-name example.com --days 730 --approve
 ```
 
 Return the signed certificate to the intermediate machine. `--csr` cannot be

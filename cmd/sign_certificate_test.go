@@ -22,7 +22,7 @@ func TestSigningInputModes(t *testing.T) {
 		t.Run(command, func(t *testing.T) {
 			base := []string{"sign", command, "--ca-key", path("root.key"), "--ca-cert", path("root.pem"), "--cert", path("issued.pem"), "--key-type", "ed25519", "--approve"}
 			if command == "intermediate" {
-				base = append(base, "--permit-dns", "example.com")
+				base = append(base, "--permit-name", "example.com")
 			}
 			for _, tc := range []struct {
 				name, message string

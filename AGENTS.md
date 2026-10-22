@@ -117,9 +117,15 @@ separately.
   duplicate CA subjects are deliberately unsupported.
 - Intermediate DNS constraints are critical, permitted domains are mandatory, and
   the default path length is explicitly zero. Child permissions cannot widen an
-  ancestor's scope; exclusions are inherited. DNS-constrained issuance requires
-  leaf DNS SANs and refuses IP/email/URI identities. Wildcard/exclusion overlaps
-  are conservatively rejected. DNS constraints do not constrain arbitrary CNs.
+  ancestor's scope; exclusions are inherited. `--permit-name` and `--exclude-name`
+  classify mixed DNS names, bare IPv4/IPv6 addresses, and CIDRs into separate X.509
+  constraint types. Bare IPs become /32 or /128 ranges. At least one permitted
+  DNS domain remains required. The former DNS/IP-specific flags were removed. IP SANs
+  require explicit permission in DNS-constrained issuers; DNS-only ancestors
+  cannot delegate IP privileges. Leaf certificates require DNS and/or permitted
+  IP SANs, and constrained issuance still refuses email/URI identities.
+  Wildcard/exclusion overlaps are conservatively rejected. Name constraints do
+  not constrain arbitrary CNs.
 - Subject-issued leaf certificates allow server and client auth, while CSR-issued
   leaf certificates allow server auth only. Each requested EKU is checked against
   the complete chain before output. CSR signatures are verified before issuance.

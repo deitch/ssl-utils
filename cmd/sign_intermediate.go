@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	permittedDomains, excludedDomains []string
-	maxPathLen                        int
+	permittedNames, excludedNames []string
+	maxPathLen                    int
 )
 
 var intermediateCmd = &cobra.Command{
@@ -29,14 +29,18 @@ var intermediateCmd = &cobra.Command{
 		if maxPathLen < 0 {
 			return fmt.Errorf("--max-path-len must be zero or positive")
 		}
-		for _, domain := range append(append([]string{}, permittedDomains...), excludedDomains...) {
-			if err := validateDomain(domain, true); err != nil {
-				return err
-			}
+		permittedDomains, ipRanges, err := parseNameConstraints(permittedNames)
+		if err != nil {
+			return err
+		}
+		excludedDomains, excludedRanges, err := parseNameConstraints(excludedNames)
+		if err != nil {
+			return err
 		}
 		if len(permittedDomains) == 0 {
-			return fmt.Errorf("at least one --permit-dns is required")
+			return fmt.Errorf("at least one permitted DNS domain is required in --permit-name")
 		}
+
 		i, err := loadIssuer(caCertPath, caKeyPath, chainPath)
 		if err != nil {
 			return err
@@ -79,10 +83,8 @@ var intermediateCmd = &cobra.Command{
 		template.PermittedDNSDomainsCritical = true
 		template.PermittedDNSDomains = append([]string{}, permittedDomains...)
 		template.ExcludedDNSDomains = append([]string{}, excludedDomains...)
-		if err := checkDNSOnlyNames(template); err != nil {
-			return err
-		}
-		if err := checkDNSNames(template.DNSNames, template); err != nil {
+		template.PermittedIPRanges, template.ExcludedIPRanges = ipRanges, excludedRanges
+		if err := checkSANPolicy(template, template); err != nil {
 			return err
 		}
 		der, err := i.issue(template, publicKey)
@@ -147,7 +149,7 @@ func intermediateInit() {
 	_ = intermediateCmd.MarkFlagRequired("cert")
 	f.StringVar(&csrPath, "csr", "", "CSR to sign instead of generating a key; cannot combine with --subject or --key")
 	f.BoolVar(&approve, "approve", false, "approve signing a CSR without prompting")
-	f.StringSliceVar(&permittedDomains, "permit-dns", nil, "permitted DNS subtree, repeatable or comma-separated; .example.com permits subdomains only")
-	f.StringSliceVar(&excludedDomains, "exclude-dns", nil, "excluded DNS subtree, repeatable or comma-separated")
+	f.StringSliceVar(&permittedNames, "permit-name", nil, "permitted DNS subtrees, IP addresses, or CIDRs; repeatable or comma-separated (e.g. esi.bak,127.0.0.1,::1/128)")
+	f.StringSliceVar(&excludedNames, "exclude-name", nil, "excluded DNS subtrees, IP addresses, or CIDRs; repeatable or comma-separated; overrides permissions")
 	f.IntVar(&maxPathLen, "max-path-len", 0, "number of additional intermediate CA levels permitted")
 }

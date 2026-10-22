@@ -99,7 +99,7 @@ func TestCSRApprovalCLI(t *testing.T) {
 				args := append([]string{"sign", command}, issuerArgs...)
 				args = append(args, "--csr", request, "--cert", output)
 				if command == "intermediate" {
-					args = append(args, "--permit-dns", "example.com")
+					args = append(args, "--permit-name", "example.com")
 				}
 				out := runCLIWithInput(t, tc.bad, tc.input, args...)
 				if !strings.Contains(out, "Approve certificate for CN=Requested") {
@@ -155,7 +155,7 @@ func TestCSRRequestedPrivilegesAreNotTrusted(t *testing.T) {
 		args := append([]string{"sign", command}, issuerArgs...)
 		args = append(args, "--csr", request, "--cert", output, "--approve")
 		if command == "intermediate" {
-			args = append(args, "--permit-dns", "example.com")
+			args = append(args, "--permit-name", "example.com")
 		}
 		runCLI(t, false, args...)
 		cert := readTestCert(t, output)

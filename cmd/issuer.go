@@ -157,11 +157,8 @@ func (i *issuer) issue(template *x509.Certificate, publicKey crypto.PublicKey) (
 				return nil, err
 			}
 		}
-		if len(ca.PermittedDNSDomains) > 0 || len(ca.ExcludedDNSDomains) > 0 {
-			if err := checkDNSOnlyNames(template); err != nil {
-				return nil, err
-			}
-			if err := checkDNSNames(template.DNSNames, ca); err != nil {
+		if hasDNSConstraints(ca) || len(ca.PermittedIPRanges) > 0 || len(ca.ExcludedIPRanges) > 0 {
+			if err := checkSANPolicy(template, ca); err != nil {
 				return nil, err
 			}
 		}
@@ -221,6 +218,34 @@ func checkDelegation(child, parent *x509.Certificate, distance int) error {
 			child.ExcludedDNSDomains = append(child.ExcludedDNSDomains, excluded)
 		}
 	}
+	for _, ipRange := range child.PermittedIPRanges {
+		if hasDNSConstraints(parent) && len(parent.PermittedIPRanges) == 0 {
+			return fmt.Errorf("issuer does not permit IP delegation; reissue the issuer with an IP address or CIDR in --permit-name")
+		}
+		if len(parent.PermittedIPRanges) > 0 {
+			allowed := false
+			for _, permitted := range parent.PermittedIPRanges {
+				allowed = allowed || ipRangeSubset(ipRange, permitted)
+			}
+			if !allowed {
+				return fmt.Errorf("intermediate IP range %s widens issuer permissions", ipRange)
+			}
+		}
+		for _, excluded := range parent.ExcludedIPRanges {
+			if ipRangeSubset(ipRange, excluded) {
+				return fmt.Errorf("intermediate IP range %s is excluded by issuer", ipRange)
+			}
+		}
+	}
+	for _, excluded := range parent.ExcludedIPRanges {
+		found := false
+		for _, existing := range child.ExcludedIPRanges {
+			found = found || existing.String() == excluded.String()
+		}
+		if !found {
+			child.ExcludedIPRanges = append(child.ExcludedIPRanges, excluded)
+		}
+	}
 	return nil
 }
 
@@ -266,14 +291,86 @@ func validateDomain(domain string, constraint bool) error {
 	return nil
 }
 
-func checkDNSOnlyNames(cert *x509.Certificate) error {
-	if len(cert.IPAddresses) > 0 || len(cert.EmailAddresses) > 0 || len(cert.URIs) > 0 {
-		return fmt.Errorf("DNS-constrained issuers cannot issue IP, email, or URI identities")
+func hasDNSConstraints(cert *x509.Certificate) bool {
+	return len(cert.PermittedDNSDomains) > 0 || len(cert.ExcludedDNSDomains) > 0
+}
+
+func checkSANPolicy(cert, ca *x509.Certificate) error {
+	if len(cert.EmailAddresses) > 0 || len(cert.URIs) > 0 {
+		return fmt.Errorf("constrained issuers cannot issue email or URI identities")
 	}
-	if !cert.IsCA && len(cert.DNSNames) == 0 {
-		return fmt.Errorf("DNS-constrained issuers require DNS SANs; common name alone is insufficient")
+	if !cert.IsCA && len(cert.DNSNames)+len(cert.IPAddresses) == 0 {
+		return fmt.Errorf("constrained issuers require DNS or permitted IP SANs; common name alone is insufficient")
 	}
-	return nil
+	if len(cert.IPAddresses) > 0 && hasDNSConstraints(ca) && len(ca.PermittedIPRanges) == 0 {
+		return fmt.Errorf("issuer does not permit IP SANs; reissue it with an IP address or CIDR in --permit-name")
+	}
+	for _, ip := range cert.IPAddresses {
+		allowed := len(ca.PermittedIPRanges) == 0
+		for _, permitted := range ca.PermittedIPRanges {
+			allowed = allowed || permitted.Contains(ip)
+		}
+		if !allowed {
+			return fmt.Errorf("IP SAN %s is outside issuer permitted ranges", ip)
+		}
+		for _, excluded := range ca.ExcludedIPRanges {
+			if excluded.Contains(ip) {
+				return fmt.Errorf("IP SAN %s is excluded by issuer", ip)
+			}
+		}
+	}
+	return checkDNSNames(cert.DNSNames, ca)
+}
+
+// parseNameConstraints classifies values like SANs, accepting CIDRs as ranges
+// and bare IP addresses as exact /32 or /128 constraints.
+func parseNameConstraints(values []string) ([]string, []*net.IPNet, error) {
+	var domains []string
+	var ranges []*net.IPNet
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if strings.Contains(value, "/") {
+			parsed, err := parseIPRanges([]string{value})
+			if err != nil {
+				return nil, nil, err
+			}
+			ranges = append(ranges, parsed...)
+		} else if ip := net.ParseIP(value); ip != nil {
+			bits := 128
+			if ipv4 := ip.To4(); ipv4 != nil {
+				ip, bits = ipv4, 32
+			}
+			ranges = append(ranges, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+		} else {
+			if err := validateDomain(value, true); err != nil {
+				return nil, nil, err
+			}
+			domains = append(domains, value)
+		}
+	}
+	return domains, ranges, nil
+}
+
+func parseIPRanges(values []string) ([]*net.IPNet, error) {
+	var ranges []*net.IPNet
+	for _, value := range values {
+		ip, ipRange, err := net.ParseCIDR(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid IP CIDR %q: %w", value, err)
+		}
+		_, bits := ipRange.Mask.Size()
+		if bits == 128 && ip.To4() != nil {
+			return nil, fmt.Errorf("IPv4-mapped IPv6 CIDR %q is unsupported; use an IPv4 CIDR", value)
+		}
+		ranges = append(ranges, ipRange)
+	}
+	return ranges, nil
+}
+
+func ipRangeSubset(child, parent *net.IPNet) bool {
+	childOnes, childBits := child.Mask.Size()
+	parentOnes, parentBits := parent.Mask.Size()
+	return childBits == parentBits && childOnes >= parentOnes && parent.Contains(child.IP)
 }
 
 func checkDNSNames(names []string, ca *x509.Certificate) error {
