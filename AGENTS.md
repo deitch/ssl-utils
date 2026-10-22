@@ -55,6 +55,7 @@ make build
 `dist/ca-<os>-<arch>` and links `./ca` for native builds. Cross-compile with
 `make build OS=linux ARCH=arm64`; `make built-name` prints the target path.
 `make install` writes to `GOBINDIR`, defaulting to `$(go env GOPATH)/bin`.
+`make test` runs `go test -race ./...`, including race detection in CI.
 
 The Makefile's binary targets track Go sources and module files. `make clean`
 only removes the root `ca` link; it does not clear `dist/`. For a disposable
