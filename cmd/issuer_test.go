@@ -275,13 +275,44 @@ func TestCLIProcess(t *testing.T) {
 
 func runCLI(t *testing.T, bad bool, args ...string) string {
 	t.Helper()
+	return runCLIWithInput(t, bad, "", args...)
+}
+
+func runCLIWithInput(t *testing.T, bad bool, input string, args ...string) string {
+	t.Helper()
 	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCLIProcess$", "--"}, args...)...)
 	cmd.Env = append(os.Environ(), "SSL_TOOLS_TEST_CLI=1")
+	cmd.Stdin = strings.NewReader(input)
 	out, err := cmd.CombinedOutput()
 	if (err != nil) != bad {
 		t.Fatalf("ca %v: error=%v, want rejection=%v\n%s", args, err, bad, out)
 	}
 	return string(out)
+}
+
+func testIssuerArgs(t *testing.T, i *issuer) []string {
+	t.Helper()
+	d := t.TempDir()
+	certPath, keyPath := filepath.Join(d, "issuer.pem"), filepath.Join(d, "issuer.key")
+	if err := certificateToPEMFile(i.chain[0].Raw, certPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := privateKeyToPEMFile(i.key, keyPath); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"--ca-cert", certPath, "--ca-key", keyPath, "--key-type", "ed25519"}
+	if len(i.chain) > 1 {
+		var ancestors [][]byte
+		for _, cert := range i.chain[1:] {
+			ancestors = append(ancestors, cert.Raw)
+		}
+		chainPath := filepath.Join(d, "ancestors.pem")
+		if err := certificatesToPEMFile(ancestors, chainPath); err != nil {
+			t.Fatal(err)
+		}
+		args = append(args, "--chain", chainPath)
+	}
+	return args
 }
 
 func readTestCert(t *testing.T, path string) *x509.Certificate {

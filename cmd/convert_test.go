@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -86,6 +87,106 @@ func TestModernPKCS12Output(t *testing.T) {
 			}
 			if _, _, _, err := pkcs12.DecodeChain(encoded, "wrong-password"); err == nil {
 				t.Fatal("key bundle accepted wrong password")
+			}
+		})
+	}
+}
+
+func TestPKCS12ImportCLI(t *testing.T) {
+	root := testRoot(t)
+	i := testIntermediate(t, root, "Intermediate", "example.com", 0)
+	pub, key := testKey(t)
+	template := testTemplate(t, "Server")
+	template.NotBefore, template.DNSNames = time.Now(), []string{"api.example.com"}
+	der, err := i.issue(template, pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, password string
+		encoder        *pkcs12.Encoder
+	}{
+		{"modern", "test-password", pkcs12.Modern},
+		{"modern empty password", "", pkcs12.Modern},
+		{"legacy input", "test-password", pkcs12.LegacyRC2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := t.TempDir()
+			path := func(name string) string { return filepath.Join(d, name) }
+			encoded, err := tc.encoder.Encode(key, leaf, i.chain, tc.password)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path("input.p12"), encoded, 0600); err != nil {
+				t.Fatal(err)
+			}
+			runCLI(t, false, "convert", "pkcs12", "read", path("input.p12"), "--password", tc.password, "--key", path("output.key"), "--cert", path("output.pem"), "--ca", path("chain.pem"))
+			assertPublicKey(t, readTestKey(t, path("output.key")).Public(), pub)
+			if !bytes.Equal(readTestCert(t, path("output.pem")).Raw, leaf.Raw) {
+				t.Fatal("leaf certificate changed during import")
+			}
+			b, err := os.ReadFile(path("chain.pem"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			chain, err := parseCertificates(b)
+			if err != nil || len(chain) != 2 {
+				t.Fatalf("import lost CA ancestors: %v", err)
+			}
+			for n, cert := range chain {
+				if !bytes.Equal(cert.Raw, i.chain[n].Raw) {
+					t.Fatal("CA chain order or certificate changed")
+				}
+			}
+			info, err := os.Stat(path("output.key"))
+			if err != nil || info.Mode().Perm() != 0600 {
+				t.Fatalf("imported key permissions: %v, %v", info, err)
+			}
+		})
+	}
+}
+
+func TestPKCS12ImportFailurePreservesOutputs(t *testing.T) {
+	root := testRoot(t)
+	encoded, err := pkcs12.Modern.Encode(root.key, root.chain[0], nil, "correct-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"wrong password", "malformed", "tampered"} {
+		t.Run(name, func(t *testing.T) {
+			d := t.TempDir()
+			path := func(name string) string { return filepath.Join(d, name) }
+			data := append([]byte{}, encoded...)
+			password := "correct-password"
+			switch name {
+			case "wrong password":
+				password = "incorrect-password"
+			case "malformed":
+				data = []byte("not PKCS12")
+			case "tampered":
+				data[len(data)-1] ^= 1
+			}
+			if err := os.WriteFile(path("input.p12"), data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []string{"key.pem", "cert.pem", "chain.pem"} {
+				if err := os.WriteFile(path(file), []byte("existing output"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out := runCLI(t, true, "convert", "pkcs12", "read", path("input.p12"), "--password", password, "--key", path("key.pem"), "--cert", path("cert.pem"), "--ca", path("chain.pem"))
+			if !strings.Contains(out, "failed to decode file") || strings.Contains(out, "panic:") {
+				t.Fatalf("expected a decoding error, got %s", out)
+			}
+			for _, file := range []string{"key.pem", "cert.pem", "chain.pem"} {
+				b, err := os.ReadFile(path(file))
+				if err != nil || string(b) != "existing output" {
+					t.Fatalf("rejected PKCS12 import changed %s", file)
+				}
 			}
 		})
 	}
